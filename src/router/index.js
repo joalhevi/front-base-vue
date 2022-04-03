@@ -1,29 +1,59 @@
+import store from '@/store'
 import Vue from 'vue'
+import routes from './routes'
 import VueRouter from 'vue-router'
-import HomeView from '../views/HomeView.vue'
 
 Vue.use(VueRouter)
 
-const routes = [
-  {
-    path: '/',
-    name: 'home',
-    component: HomeView
-  },
-  {
-    path: '/about',
-    name: 'about',
-    // route level code-splitting
-    // this generates a separate chunk (about.[hash].js) for this route
-    // which is lazy-loaded when the route is visited.
-    component: () => import(/* webpackChunkName: "about" */ '../views/AboutView.vue')
-  }
-]
-
 const router = new VueRouter({
+  routes,
   mode: 'history',
   base: process.env.BASE_URL,
-  routes
+  linkExactActiveClass: 'active',
+  scrollBehavior(){
+    return {x:0, y:0}
+  }
 })
+
+router.beforeEach((to, from, next) => {
+  if (to.matched.some(record => record.meta.requiresAuth)) {
+    if (!store.state.auth.isLogged) {
+      next({
+        name: 'login',
+      })
+    } else {
+
+      let userPermissions= store.state.auth.abilities;
+      if (userPermissions.includes('*'))  {
+        next()
+      }
+      else if(userPermissions.includes(to.name)){
+        next()
+      }else {
+        console.log('sin permiso')
+        next('/403')
+      }
+    }
+  } else if (to.matched.some(record => record.meta.requiresVisitor)) {
+    if (store.state.auth.isLogged) {
+      next({
+        name: 'home',
+      })
+    } else {
+      next()
+    }
+  } else {
+    next()
+  }
+})
+
+router.afterEach ((to, from) => {
+  if(to.path != '/login'){
+
+    if (store.state.auth.user.reinicio_password){
+      router.push('/reset')
+    }
+  }
+});
 
 export default router
